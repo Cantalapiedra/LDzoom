@@ -12,38 +12,100 @@
 suppressMessages(library(methods))
 suppressMessages(library(dplyr))
 suppressMessages(library(ggplot2))
+suppressMessages(library("optparse"))
+
+## Parameters specification
+
+option_list = list(
+    make_option("--marker", type="character", default=NULL, 
+        help="Marker to be used a center of the interval and to compute LD around it.",
+        metavar="character"),
+    
+    make_option("--hmp", type="character", default=NULL, 
+        help="Hapmap to compute the LD and zoom into it.",
+        metavar="character"),
+    
+    make_option("--chrom", type="character", default=NULL, 
+        help="Chromosome where --marker is located (both --chrom, --start and --end are used to specify which region to zoom in for those markers with multiple mappings to different loci.",
+        metavar="character"),
+        
+    make_option("--start", type="numeric", default=NULL, 
+        help="Start position of --marker alignment to the reference (both --chrom, --start and --end are used to specify which region to zoom in for those markers with multiple mappings to different loci.",
+        metavar="character"),
+        
+    make_option("--end", type="numeric", default=NULL, 
+        help="End position of --marker alignment to the reference (both --chrom, --start and --end are used to specify which region to zoom in for those markers with multiple mappings to different loci.",
+        metavar="character"),
+        
+    make_option("--ldthres", type="numeric", default=NULL, 
+        help="When the LD from a given position to --marker goes below this --ldthres, the previous position is a end limit of the final interval.",
+        metavar="character"),
+    
+    make_option("--interval_max", type="numeric", default=NULL, 
+        help="The final interval reported will never exceed --interval_max, even if the LD does not ever go below --ldthres",
+        metavar="character"),
+    
+    make_option("--interval_min", type="numeric", default=NULL, 
+        help="The final interval span will never be smaller than --interval_min, even if the LD goes below --ldthres closer to the --marker",
+        metavar="character"),
+        
+    make_option("--window_size", type="numeric", default=NULL, 
+        help="How many adjacent markers will be used to compute each LD value.",
+        metavar="character"),
+    
+    make_option("--window_step", type="numeric", default=NULL, 
+        help="How many markers will skip one LD window from the previous LD window.",
+        metavar="character")
+); 
+
+## Read and check parameters
+
+opt_parser = OptionParser(option_list=option_list);
+opt = parse_args(opt_parser);
 
 write("Running marker_LD_region.R...", file=stderr())
 
-## Read parameters
-args = commandArgs(trailingOnly=TRUE)
+if (is.null(opt$marker)){
+    message("Missing the --marker parameter, which is mandatory.")
+    print_help(opt_parser)
+    stop()
+}
 
-#marker_id <- args[1] # a list of markers to analyze
-#marker_chrom <- args[2]
-#marker_start <- as.numeric(args[3])
-#marker_end <- as.numeric(args[4])
-#max_interval <- as.numeric(args[5])
-#MIN_INTERVAL <- as.numeric(args[6])
-#hapmap_filename <- args[7]
-#WINDOW_SIZE <- as.numeric(args[8]) # 10
-#WINDOW_STEP <- as.numeric(args[9]) # 5
-#LDTHRES <- as.numeric(args[10]) # 0.2
+if (is.null(opt$hmp)){
+    message("Missing the --hmp parameter, which is mandatory.")
+    print_help(opt_parser)
+    stop()
+}
+
+if (is.null(opt$chrom)){
+    message("Missing the --chrom parameter, which is mandatory.")
+    print_help(opt_parser)
+    stop()
+}
+
+if (is.null(opt$start)){
+    message("Missing the --start parameter, which is mandatory.")
+    print_help(opt_parser)
+    stop()
+}
+
+if (is.null(opt$end)){
+    message("Missing the --end parameter, which is mandatory.")
+    print_help(opt_parser)
+    stop()
+}
 
 ## mandatory parameters
-marker_id <- args[1] # a list of markers to analyze
-hapmap_filename <- args[2] # the genotyping file to be zoom in
-marker_chrom <- args[2] # chromosome
-marker_start <- as.numeric(args[3]) # start position
-marker_end <- as.numeric(args[4]) # end position
-
-## recommended parameters
-LDTHRES <- as.numeric(args[5]) # LD threshold which will define the ending interval
-
-## other parameters
-max_interval <- as.numeric(args[6]) # max ending interval
-MIN_INTERVAL <- as.numeric(args[7]) # min ending interval
-WINDOW_SIZE <- as.numeric(args[8]) # number of markers to compute LD. def: 10
-WINDOW_STEP <- as.numeric(args[9]) # number of markers to skip between each window. def: 5
+marker_id <- opt$marker # args[1] # a list of markers to analyze
+hapmap_filename <- opt$hmp # args[2] # the genotyping file to be zoom in
+marker_chrom <- opt$chrom # args[3] # chromosome
+marker_start <- opt$start # as.numeric(args[4]) # start position
+marker_end <- opt$end # as.numeric(args[5]) # end position
+LDTHRES <- opt$ldthres # 0.2 (20% LD decay)
+max_interval <- opt$interval_max # 10000000 # 10 Mbp (20 Mbp total)
+MIN_INTERVAL <- opt$interval_min # 50000 # 50 kbp (100 kbp total)
+WINDOW_SIZE <- opt$window_size # 10 markers for each LD value
+WINDOW_STEP <- opt$window_step # each windows is 5 markers from the previous
 
 cat("Parameters:\n", file=stderr())
 cat(paste("\t", marker_id, "\n"), file=stderr())
@@ -52,7 +114,7 @@ cat(paste("\t", marker_chrom, "\n"), file=stderr())
 cat(paste("\t", marker_start, "\n"), file=stderr())
 cat(paste("\t", marker_end, "\n"), file=stderr())
 cat(paste("\t", LDTHRES, "\n"), file=stderr())
-cat(paste("\t", max_interval, "\n"), file=stderr())
+cat(paste("\t", MAX_INTERVAL, "\n"), file=stderr())
 cat(paste("\t", MIN_INTERVAL, "\n"), file=stderr())
 cat(paste("\t", WINDOW_SIZE, "\n"), file=stderr())
 cat(paste("\t", WINDOW_STEP, "\n"), file=stderr())
