@@ -1,7 +1,7 @@
 # LDzoom
 An R script to reduce a hapmap based on LD decay around a specified marker
 
-Usage: /home/carlospc/bin/LDzoom.R [options]
+Usage: LDzoom.R [options]
 
 Options:
 	--marker=CHARACTER
