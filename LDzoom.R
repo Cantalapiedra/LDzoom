@@ -8,11 +8,15 @@
 ## based on its LD decay with surrounding markers.
 ##
 
+write("Running marker_LD_region.R...", file=stderr())
+
 # Load R libraries
 suppressMessages(library(methods))
 suppressMessages(library(dplyr))
 suppressMessages(library(ggplot2))
 suppressMessages(library("optparse"))
+suppressMessages(library(varhandle))
+suppressMessages(library(LDcorSV))
 
 ## Parameters specification
 
@@ -37,7 +41,7 @@ option_list = list(
         help="End position of --marker alignment to the reference (both --chrom, --start and --end are used to specify which region to zoom in for those markers with multiple mappings to different loci.",
         metavar="character"),
         
-    make_option("--ldthres", type="numeric", default=NULL, 
+    make_option("--ldthres", type="numeric", default=0.2, 
         help="When the LD from a given position to --marker goes below this --ldthres, the previous position is a end limit of the final interval.",
         metavar="character"),
     
@@ -63,49 +67,51 @@ option_list = list(
 opt_parser = OptionParser(option_list=option_list);
 opt = parse_args(opt_parser);
 
-write("Running marker_LD_region.R...", file=stderr())
-
 if (is.null(opt$marker)){
     message("Missing the --marker parameter, which is mandatory.")
     print_help(opt_parser)
     stop()
+} else {
+    marker_id = opt$marker
 }
 
 if (is.null(opt$hmp)){
     message("Missing the --hmp parameter, which is mandatory.")
     print_help(opt_parser)
     stop()
+} else {
+    hapmap_filename = opt$hmp
 }
 
 if (is.null(opt$chrom)){
     message("Missing the --chrom parameter, which is mandatory.")
     print_help(opt_parser)
     stop()
+} else {
+    marker_chrom = opt$chrom
 }
 
 if (is.null(opt$start)){
     message("Missing the --start parameter, which is mandatory.")
     print_help(opt_parser)
     stop()
+} else {
+    marker_start = opt$start
 }
 
 if (is.null(opt$end)){
     message("Missing the --end parameter, which is mandatory.")
     print_help(opt_parser)
     stop()
+} else {
+    marker_end = opt$end
 }
 
-## mandatory parameters
-marker_id <- opt$marker # args[1] # a list of markers to analyze
-hapmap_filename <- opt$hmp # args[2] # the genotyping file to be zoom in
-marker_chrom <- opt$chrom # args[3] # chromosome
-marker_start <- opt$start # as.numeric(args[4]) # start position
-marker_end <- opt$end # as.numeric(args[5]) # end position
-LDTHRES <- opt$ldthres # 0.2 (20% LD decay)
-max_interval <- opt$interval_max # 10000000 # 10 Mbp (20 Mbp total)
-MIN_INTERVAL <- opt$interval_min # 50000 # 50 kbp (100 kbp total)
-WINDOW_SIZE <- opt$window_size # 10 markers for each LD value
-WINDOW_STEP <- opt$window_step # each windows is 5 markers from the previous
+LDTHRES = opt$ldthres
+MAX_INTERVAL <- opt$interval_max
+MIN_INTERVAL <- opt$interval_min
+WINDOW_SIZE <- opt$window_size
+WINDOW_STEP <- opt$window_step
 
 cat("Parameters:\n", file=stderr())
 cat(paste("\t", marker_id, "\n"), file=stderr())
@@ -241,13 +247,20 @@ gmat <- NA
 # This was known as a bug already in 2015
 
 # Reading markers list
-cat("Reading hapmap file... this could take a while...\n", file=stderr())
+
+write("Reading hapmap file... this could take a while...\n", file=stderr())
 hapmap_df <- read.table(hapmap_filename, header = TRUE)
 
-# Remove markers in other chromosomes
-hapmap_df <- hapmap_df[hapmap_df$c==marker_chrom,] %>% arrange(c, pos)
+# Remove markers in other chromosomes, pre-filter for maximum interval,
+# and sort by chromosome and position
 
-#print(head(hapmap_df))
+# upstream and downstream max interval positions
+upspos = ifelse(marker_start - MAX_INTERVAL > 0, marker_start - MAX_INTERVAL, 1)
+dowpos = marker_start + MAX_INTERVAL
+
+hapmap_df <- hapmap_df[hapmap_df$c==marker_chrom &
+                        hapmap_df$pos>=upspos &
+                        hapmap_df$pos<=dowpos,] %>% arrange(c, pos)
 
 ## Transform the data to LDcorSV format
 ## columns: markers
@@ -255,20 +268,16 @@ hapmap_df <- hapmap_df[hapmap_df$c==marker_chrom,] %>% arrange(c, pos)
 ## values: 0,1,2
 ##
 
-cat("Formatting markers... please be patient...\n", file=stderr())
+write("Formatting markers... please be patient...\n", file=stderr())
 ldcorsv_df <- f_ldcorsv_format(hapmap_df)
-
-#print(head(ldcorsv_df))
 
 # I need to change the type of data of the data.frame
 # from "factor" (as can be seen running sapply(lodcorsv_df, class))
 # to "numeric". I do this with the library "varhandle":
-library(varhandle)
 ldcorsv_df <- unfactor(ldcorsv_df)
 
 ## Compute LD for all the markers
-cat("Computing LD... just a bit more of patience... ;)\n", file=stderr())
-library(LDcorSV)
+write("Computing LD... just a bit more of patience... ;)\n", file=stderr())
 
 LD <- f_compute_LD(ldcorsv_df, marker_id)
 
@@ -276,14 +285,14 @@ LD <- f_compute_LD(ldcorsv_df, marker_id)
 
 # Compute LD for windows
 
-cat("Computing LD decay... we are almost done... ;)\n", file=stderr())
+write("Computing LD decay... we are almost done... ;)\n", file=stderr())
 LDwindows <- f_compute_windows_LD(hapmap_df, LD, WINDOW_SIZE, WINDOW_STEP)
-
-#print(LDwindows)
 
 # markers to plot along with the LD windows
 
 #hapmap_pos = hapmap_df %>% select(pos) %>% mutate(r2 = 0)
+
+# plot the LD
 
 LDoutfile=paste("LD/", marker_id, ".", marker_chrom, ".", marker_start, ".r2.png", sep="")
 png(LDoutfile, width=400, height=400)
@@ -297,8 +306,10 @@ devnull <- dev.off()
 LDtsvfile=paste("LD/", marker_id, ".", marker_chrom, ".", marker_start, ".r2.tsv", sep="")
 write.table(LDwindows, file=LDtsvfile, sep="\t")
 
+############################# Define a new interval based on LD decay
 #############################
-cat("Defining LD threshold region...\n", file=stderr())
+
+write("Defining LD threshold region...\n", file=stderr())
 
 ## Look for LD windows threshold
 
@@ -311,12 +322,11 @@ for (i in seq(1, nrow(upstream_windows))){
     curr_window = upstream_windows[i,]
     if (curr_window$r2 >= LDTHRES) {
         prev_pos = curr_window$pos;
-    } else {
+    } else { # if the LD threshold was achieved
         break;
     }
 }
 
-MIN_INTERVAL = 100000
 if (prev_pos == -1){
     upstream_pos = ifelse(marker_start - MIN_INTERVAL > 0, marker_start - MIN_INTERVAL, 1);
     
@@ -343,13 +353,15 @@ for (i in seq(1, nrow(downstream_windows))){
 
 if (prev_pos == -1){
     downstream_pos = marker_start + MIN_INTERVAL
+    
 } else if (prev_pos - marker_start < MIN_INTERVAL) {
     downstream_pos = marker_start + MIN_INTERVAL;
+    
 } else {
     downstream_pos = prev_pos
 }
 
-cat(paste("The final interval defined by LD will span: ", upstream_pos, " - ", downstream_pos, "\n", sep=""), file=stderr())
+write(paste("#", marker_id, ":", marker_chrom, "-", marker_start, ":", upstream_pos, "-", downstream_pos, "\n", sep=""), file=stdout())
 
 LDregion <- LDwindows[LDwindows$pos >= upstream_pos &
                         LDwindows$pos <= downstream_pos,]
@@ -366,7 +378,7 @@ devnull <- dev.off()
 LDtsvfile=paste("LD/", marker_id, ".", marker_chrom, ".", marker_start, ".r2.LDregion.tsv", sep="")
 write.table(LDregion, file=LDtsvfile, sep="\t")
 
-cat("Finished!\n", file=stderr())
+write("Finished.\n", file=stderr())
 
 q()
 
