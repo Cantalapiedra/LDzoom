@@ -41,10 +41,20 @@ Note: marker, hmp, chrom, start and end are mandatory parameters.
 marker, chrom, start and end define a marker locus, which must be included in the region defined by markers in hmp.
 ldthres value will help define the new region based on LD decay.
 
-Output: the script generates several files, within a LD/ folder which must exist.
-Also outputs to the stdout the a row with the following format:
+Output: 
+
+the script outputs to the stdout a row with the following format:
 
 #marker_id:marker_chrom-marker_start:marker_LD_start-marker_LD_end
 
 marker_id marker_chrom and marker_start are the same used as parameters
 marker_LD_start and marker_LD_end are the positions defined by LD decay and the specified --ldthress
+
+LDzoom.R also generates several files, within a LD/ folder which must have been created previously:
+
+- marker.chrom.start.r2.tsv # r2 of all the markers
+- marker.chrom.start.r2.png # r2/position plot of the previous file
+- marker.chrom.start.r2.LDregion.tsv # r2 of all the markers against marker_id, only in the 
+- marker.chrom.start.r2.LDregion.png # r2/position plot of the previous file
+- marker.chrom.start.LDregion.hmp # new hapmap defined through LD decay
+
