@@ -8,7 +8,7 @@
 ## based on its LD decay with surrounding markers.
 ##
 
-write("Running marker_LD_region.R...", file=stderr())
+write("Running LDzoom...", file=stderr())
 
 # Load R libraries
 suppressMessages(library(methods))
@@ -23,43 +23,43 @@ suppressMessages(library(LDcorSV))
 option_list = list(
     make_option("--marker", type="character", default=NULL, 
         help="Marker to be used a center of the interval and to compute LD around it.",
-        metavar="character"),
+        metavar="char"),
     
     make_option("--hmp", type="character", default=NULL, 
         help="Hapmap to compute the LD and zoom into it.",
-        metavar="character"),
+        metavar="FILE"),
     
     make_option("--chrom", type="character", default=NULL, 
         help="Chromosome where --marker is located (both --chrom, --start and --end are used to specify which region to zoom in for those markers with multiple mappings to different loci.",
-        metavar="character"),
+        metavar="char"),
         
     make_option("--start", type="numeric", default=NULL, 
         help="Start position of --marker alignment to the reference (both --chrom, --start and --end are used to specify which region to zoom in for those markers with multiple mappings to different loci.",
-        metavar="character"),
+        metavar="int"),
         
     make_option("--end", type="numeric", default=NULL, 
         help="End position of --marker alignment to the reference (both --chrom, --start and --end are used to specify which region to zoom in for those markers with multiple mappings to different loci.",
-        metavar="character"),
+        metavar="int"),
         
     make_option("--ldthres", type="numeric", default=0.2, 
         help="When the LD from a given position to --marker goes below this --ldthres, the previous position is a end limit of the final interval.",
-        metavar="character"),
+        metavar="float"),
     
     make_option("--interval_max", type="numeric", default=NULL, 
         help="The final interval reported will never exceed --interval_max, even if the LD does not ever go below --ldthres",
-        metavar="character"),
+        metavar="int"),
     
     make_option("--interval_min", type="numeric", default=NULL, 
         help="The final interval span will never be smaller than --interval_min, even if the LD goes below --ldthres closer to the --marker",
-        metavar="character"),
+        metavar="int"),
         
     make_option("--window_size", type="numeric", default=NULL, 
         help="How many adjacent markers will be used to compute each LD value.",
-        metavar="character"),
+        metavar="int"),
     
     make_option("--window_step", type="numeric", default=NULL, 
         help="How many markers will skip one LD window from the previous LD window.",
-        metavar="character")
+        metavar="int")
 ); 
 
 ## Read and check parameters
@@ -361,7 +361,7 @@ if (prev_pos == -1){
     downstream_pos = prev_pos
 }
 
-write(paste("#", marker_id, ":", marker_chrom, "-", marker_start, ":", upstream_pos, "-", downstream_pos, "\n", sep=""), file=stdout())
+write(paste("#", marker_id, ":", marker_chrom, "-", marker_start, ":", upstream_pos, "-", downstream_pos, sep=""), file=stdout())
 
 LDregion <- LDwindows[LDwindows$pos >= upstream_pos &
                         LDwindows$pos <= downstream_pos,]
